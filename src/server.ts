@@ -31,6 +31,16 @@ export function getProxyPath(originalPath: string): string {
 }
 
 /**
+ * Strips query parameters from a URL path
+ * @param urlPath - The URL path potentially containing query parameters
+ * @returns The path without query parameters
+ */
+export function stripQueryParams(urlPath: string): string {
+  const queryIndex = urlPath.indexOf('?');
+  return queryIndex === -1 ? urlPath : urlPath.substring(0, queryIndex);
+}
+
+/**
  * Builds an endpoint map from parsed HAR entries
  * Key format: "METHOD:/proxy{path}"
  * Later entries override earlier ones (latest wins)
@@ -103,8 +113,9 @@ export function createRequestHandler(
 ) {
   return (req: IncomingMessage, res: ServerResponse) => {
     const method = req.method?.toUpperCase() || 'GET';
-    const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
-    const path = url.pathname;
+    // Strip query parameters from URL for matching - only use path portion
+    const rawUrl = req.url || '/';
+    const path = stripQueryParams(rawUrl);
 
     // Serve dashboard at root (internal route)
     if (path === '/' && method === 'GET') {

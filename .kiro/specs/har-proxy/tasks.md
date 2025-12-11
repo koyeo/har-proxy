@@ -71,6 +71,28 @@
 - [x] 5. Final Checkpoint
   - Ensure all tests pass, ask the user if questions arise.
 
+- [x] 6. Implement query parameter stripping for URL matching
+  - [x] 6.1 Add stripQueryParams helper function to server module
+    - Implement `stripQueryParams(urlPath: string): string` function
+    - Function should remove everything after `?` from the URL path
+    - _Requirements: 3.7_
+  - [x] 6.2 Update request handler to strip query params before matching
+    - Modify the route matching logic to call `stripQueryParams()` on incoming request URL
+    - Ensure matching uses only the path portion without query parameters
+    - _Requirements: 3.7_
+  - [ ]* 6.3 Write property test for query parameter stripping
+    - **Property 15: Query Parameter Stripping**
+    - **Validates: Requirements 3.7**
+  - [ ]* 6.4 Write unit tests for stripQueryParams function
+    - Test empty query string
+    - Test single query parameter
+    - Test multiple query parameters
+    - Test URL without query parameters (should return unchanged)
+    - _Requirements: 3.7_
+
+- [ ] 7. Checkpoint
+  - Ensure all tests pass, ask the user if questions arise.
+
 ## Previously Completed Tasks (Reference Only)
 
 The following tasks were completed in the initial implementation:

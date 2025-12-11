@@ -54,6 +54,7 @@ har-proxy is a terminal command-line tool that parses HAR (HTTP Archive) files e
 4. WHEN the recorded response contains specific headers THEN the Mock_Server SHALL include those headers in the response
 5. WHEN the recorded response contains a body THEN the Mock_Server SHALL return the exact body content with the correct content-type
 6. WHEN the Mock_Server registers HAR entries THEN the Mock_Server SHALL prefix all recorded paths with `/proxy` to avoid conflicts with internal routes
+7. WHEN a client sends an HTTP request with query parameters (e.g., `?network=eth&txId=0x...`) THEN the Mock_Server SHALL strip the query parameters and match only the path portion against recorded entries
 
 ### Requirement 4
 

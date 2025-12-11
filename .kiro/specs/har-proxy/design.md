@@ -122,6 +122,7 @@ function createServer(config: ServerConfig): http.Server;
 function buildEndpointMap(entries: HarEntry[]): EndpointMap;
 function findMatchingEntry(method: string, path: string, map: EndpointMap): HarEntry | null;
 function getProxyPath(originalPath: string): string; // Returns "/proxy" + originalPath
+function stripQueryParams(urlPath: string): string; // Removes query string from URL path
 function handlePreflightRequest(res: ServerResponse): void; // Handles OPTIONS preflight requests
 function applyCorsHeaders(res: ServerResponse, headers: Record<string, string>): void; // Adds CORS headers to response
 ```
@@ -234,6 +235,12 @@ interface EndpointRegistry {
 
 **Validates: Requirements 3.2**
 
+### Property 15: Query Parameter Stripping
+
+*For any* HTTP request to `/proxy/*` containing query parameters, the Mock_Server SHALL strip the query parameters before matching, and a request with query parameters SHALL match the same entry as a request without query parameters to the same path.
+
+**Validates: Requirements 3.7**
+
 ### Property 11: Proxy Path Prefix Consistency
 
 *For any* HAR entry with path P, the endpoint SHALL be registered and accessible at `/proxy` + P, ensuring no conflicts with internal routes.
@@ -342,6 +349,7 @@ Key property tests:
 10. **Endpoint Count** - Generate entries, verify displayed count matches
 11. **Proxy Path Prefix** - Generate entries, verify all are accessible at `/proxy` + original path
 12. **CORS Headers by Default** - Generate requests, verify CORS headers present when enabled
+15. **Query Parameter Stripping** - Generate requests with query params, verify they match same entries as without query params
 13. **Preflight OPTIONS Handling** - Generate OPTIONS requests, verify 204 response with CORS headers
 14. **CORS Disabled Preserves Original** - Generate entries with CORS headers, disable CORS, verify original headers preserved
 
