@@ -7,15 +7,31 @@ import { createServer as createHttpServer, type Server, type IncomingMessage, ty
 import type { HarEntry, ServerConfig, EndpointMap } from './types/index.js';
 
 /**
+ * Proxy path prefix for all HAR-recorded endpoints
+ * This separates HAR endpoints from internal routes (dashboard, health checks, etc.)
+ */
+export const PROXY_PREFIX = '/proxy';
+
+/**
+ * Converts an original path to a proxy-prefixed path
+ * @param originalPath - The original path from HAR entry (e.g., "/api/users")
+ * @returns The proxy-prefixed path (e.g., "/proxy/api/users")
+ */
+export function getProxyPath(originalPath: string): string {
+  return PROXY_PREFIX + originalPath;
+}
+
+/**
  * Builds an endpoint map from parsed HAR entries
- * Key format: "METHOD:path"
+ * Key format: "METHOD:/proxy{path}"
  * Later entries override earlier ones (latest wins)
  */
 export function buildEndpointMap(entries: HarEntry[]): EndpointMap {
   const map: EndpointMap = {};
   
   for (const entry of entries) {
-    const key = `${entry.method}:${entry.path}`;
+    const proxyPath = getProxyPath(entry.path);
+    const key = `${entry.method}:${proxyPath}`;
     map[key] = entry;
   }
   
@@ -59,14 +75,25 @@ export function createRequestHandler(
     const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
     const path = url.pathname;
 
-    // Serve dashboard at root
+    // Serve dashboard at root (internal route)
     if (path === '/' && method === 'GET') {
       dashboardHandler(res);
       logger?.(method, path, 200);
       return;
     }
 
-    // Find matching entry
+    // Only handle requests under /proxy/* for HAR endpoints
+    if (!path.startsWith(PROXY_PREFIX)) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ 
+        error: 'Not Found', 
+        message: `Path ${path} is not a proxy endpoint. HAR endpoints are available under ${PROXY_PREFIX}/*` 
+      }));
+      logger?.(method, path, 404);
+      return;
+    }
+
+    // Find matching entry in the proxy namespace
     const entry = findMatchingEntry(method, path, endpointMap);
 
     if (!entry) {

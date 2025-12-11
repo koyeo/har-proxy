@@ -8,7 +8,9 @@ import {
   groupEndpoints,
   getBasePath,
   generateDashboard,
+  toEndpointInfo,
 } from '../src/dashboard.js';
+import { PROXY_PREFIX } from '../src/server.js';
 import type { HarEntry } from '../src/types/index.js';
 
 // Generators for dashboard tests
@@ -46,11 +48,11 @@ describe('Dashboard', () => {
   /**
    * **Feature: har-proxy, Property 9: Dashboard Groups by Base Path**
    * *For any* set of entries, endpoints sharing the same base path (first path
-   * segment) SHALL be grouped together in the dashboard output.
+   * segment after /proxy) SHALL be grouped together in the dashboard output.
    * **Validates: Requirements 4.5**
    */
   describe('Property 9: Dashboard Groups by Base Path', () => {
-    it('should group endpoints by their first path segment', () => {
+    it('should group endpoints by their base path (including /proxy prefix)', () => {
       fc.assert(
         fc.property(
           fc.array(harEntryArb, { minLength: 1, maxLength: 10 }),
@@ -59,14 +61,16 @@ describe('Dashboard', () => {
 
             // Verify each entry appears in the correct group
             for (const entry of entries) {
-              const expectedBasePath = getBasePath(entry.path);
+              // toEndpointInfo adds the /proxy prefix
+              const endpointInfo = toEndpointInfo(entry);
+              const expectedBasePath = getBasePath(endpointInfo.path);
               const group = groups.find((g) => g.basePath === expectedBasePath);
 
               expect(group).toBeDefined();
               
-              // Verify the entry is in this group
+              // Verify the entry is in this group (path now includes /proxy prefix)
               const found = group!.endpoints.some(
-                (ep) => ep.path === entry.path && ep.method === entry.method
+                (ep) => ep.path === endpointInfo.path && ep.method === entry.method
               );
               expect(found).toBe(true);
             }
@@ -110,11 +114,11 @@ describe('Dashboard', () => {
   /**
    * **Feature: har-proxy, Property 8: Dashboard Displays Complete Endpoint Info**
    * *For any* set of registered entries, the generated dashboard HTML SHALL
-   * contain the method, path, status code, and content-type for every entry.
+   * contain the method, proxy-prefixed path, status code, and content-type for every entry.
    * **Validates: Requirements 4.2, 4.3, 4.4**
    */
   describe('Property 8: Dashboard Displays Complete Endpoint Info', () => {
-    it('should include method, path, status, and content-type for all entries', () => {
+    it('should include method, proxy-prefixed path, status, and content-type for all entries', () => {
       fc.assert(
         fc.property(
           fc.array(harEntryArb, { minLength: 1, maxLength: 10 }),
@@ -125,8 +129,9 @@ describe('Dashboard', () => {
               // Verify method is present
               expect(html).toContain(entry.method);
               
-              // Verify path is present (escaped for HTML)
-              expect(html).toContain(entry.path);
+              // Verify proxy-prefixed path is present (escaped for HTML)
+              const proxyPath = PROXY_PREFIX + entry.path;
+              expect(html).toContain(proxyPath);
               
               // Verify status code is present
               expect(html).toContain(String(entry.status));

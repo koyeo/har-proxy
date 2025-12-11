@@ -12,6 +12,7 @@ har-proxy is a terminal command-line tool that parses HAR (HTTP Archive) files e
 - **Dashboard**: A visual web interface that displays the list of supported endpoints
 - **CLI**: Command-line interface, the entry point for user interaction with the har-proxy tool
 - **Entry**: A single request/response record in a HAR file
+- **Proxy Path Prefix**: The `/proxy` prefix added to all HAR-recorded endpoints to separate them from internal routes (Dashboard, health checks, etc.)
 
 ## Requirements
 
@@ -45,11 +46,12 @@ har-proxy is a terminal command-line tool that parses HAR (HTTP Archive) files e
 
 #### Acceptance Criteria
 
-1. WHEN a client sends an HTTP request matching a recorded entry's method and path THEN the Mock_Server SHALL return the corresponding recorded response
-2. WHEN a client sends an HTTP request that does not match any recorded entry THEN the Mock_Server SHALL return a 404 status code with an appropriate error message
+1. WHEN a client sends an HTTP request to `/proxy/*` matching a recorded entry's method and path THEN the Mock_Server SHALL return the corresponding recorded response
+2. WHEN a client sends an HTTP request to `/proxy/*` that does not match any recorded entry THEN the Mock_Server SHALL return a 404 status code with an appropriate error message
 3. WHEN multiple entries match the same method and path THEN the Mock_Server SHALL return the response from the most recent entry
 4. WHEN the recorded response contains specific headers THEN the Mock_Server SHALL include those headers in the response
 5. WHEN the recorded response contains a body THEN the Mock_Server SHALL return the exact body content with the correct content-type
+6. WHEN the Mock_Server registers HAR entries THEN the Mock_Server SHALL prefix all recorded paths with `/proxy` to avoid conflicts with internal routes
 
 ### Requirement 4
 
@@ -58,7 +60,7 @@ har-proxy is a terminal command-line tool that parses HAR (HTTP Archive) files e
 #### Acceptance Criteria
 
 1. WHEN the Mock_Server is running THEN the Dashboard SHALL be accessible at the root path `/`
-2. WHEN a user visits the Dashboard THEN the Dashboard SHALL display a list of all available endpoints with their HTTP methods
+2. WHEN a user visits the Dashboard THEN the Dashboard SHALL display a list of all available endpoints with their HTTP methods and full proxy paths (prefixed with `/proxy`)
 3. WHEN a user visits the Dashboard THEN the Dashboard SHALL display the response status code for each endpoint
 4. WHEN a user visits the Dashboard THEN the Dashboard SHALL display the content-type for each endpoint
 5. WHEN the endpoint list is displayed THEN the Dashboard SHALL group endpoints by their base path for better organization

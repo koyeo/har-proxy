@@ -4,37 +4,54 @@
  */
 
 import type { HarEntry, EndpointGroup, EndpointInfo } from './types/index.js';
+import { PROXY_PREFIX } from './server.js';
 
 /**
- * Extracts the base path (first path segment) from a full path
+ * Extracts the base path from a full path
+ * For proxy paths like /proxy/api/users, returns /proxy/api
+ * For paths like /proxy/users, returns /proxy/users
  */
 export function getBasePath(path: string): string {
   const segments = path.split('/').filter(Boolean);
-  return segments.length > 0 ? `/${segments[0]}` : '/';
+  // For proxy paths, include /proxy and the next segment (if exists)
+  if (segments.length >= 2 && segments[0] === 'proxy') {
+    return `/${segments[0]}/${segments[1]}`;
+  }
+  // For single segment paths like /proxy or /-
+  if (segments.length === 1) {
+    return `/${segments[0]}`;
+  }
+  // For paths with multiple segments not starting with proxy
+  if (segments.length >= 1) {
+    return `/${segments[0]}`;
+  }
+  return '/';
 }
 
 /**
  * Converts a HarEntry to EndpointInfo for dashboard display
+ * Displays the full proxy-prefixed path
  */
 export function toEndpointInfo(entry: HarEntry): EndpointInfo {
   return {
     method: entry.method,
-    path: entry.path,
+    path: PROXY_PREFIX + entry.path,
     status: entry.status,
     contentType: entry.contentType,
   };
 }
 
 /**
- * Groups entries by their base path (first path segment)
+ * Groups entries by their base path (first path segment after /proxy)
  * Sorts groups and endpoints within groups alphabetically
  */
 export function groupEndpoints(entries: HarEntry[]): EndpointGroup[] {
   const groups = new Map<string, EndpointInfo[]>();
 
   for (const entry of entries) {
-    const basePath = getBasePath(entry.path);
     const info = toEndpointInfo(entry);
+    // Use the proxy-prefixed path for base path calculation
+    const basePath = getBasePath(info.path);
 
     if (!groups.has(basePath)) {
       groups.set(basePath, []);

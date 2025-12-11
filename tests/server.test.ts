@@ -8,6 +8,8 @@ import {
   buildEndpointMap,
   findMatchingEntry,
   getEndpointCount,
+  getProxyPath,
+  PROXY_PREFIX,
 } from '../src/server.js';
 import type { HarEntry } from '../src/types/index.js';
 
@@ -46,27 +48,83 @@ const harEntryArb: fc.Arbitrary<HarEntry> = fc.record({
 
 describe('Mock Server', () => {
   /**
-   * **Feature: har-proxy, Property 4: Request-Response Matching**
-   * *For any* registered endpoint entry, sending an HTTP request with the same
-   * method and path SHALL return the recorded response with matching status code.
-   * **Validates: Requirements 3.1**
+   * **Feature: har-proxy, Property 11: Proxy Path Prefix Consistency**
+   * *For any* HAR entry with path P, the endpoint SHALL be registered and accessible
+   * at `/proxy` + P, ensuring no conflicts with internal routes.
+   * **Validates: Requirements 3.6**
    */
-  describe('Property 4: Request-Response Matching', () => {
-    it('should return matching entry for registered method and path', () => {
+  describe('Property 11: Proxy Path Prefix Consistency', () => {
+    it('should prefix all paths with /proxy and make them accessible only at proxy path', () => {
       fc.assert(
         fc.property(
           fc.array(harEntryArb, { minLength: 1, maxLength: 10 }),
           (entries) => {
             const map = buildEndpointMap(entries);
             
-            // For each entry, verify we can find it by method and path
             for (const entry of entries) {
-              const found = findMatchingEntry(entry.method, entry.path, map);
+              const originalPath = entry.path;
+              const proxyPath = getProxyPath(originalPath);
+              
+              // Verify proxy path starts with PROXY_PREFIX
+              expect(proxyPath).toBe(PROXY_PREFIX + originalPath);
+              
+              // Entry should be accessible at proxy path
+              const foundAtProxy = findMatchingEntry(entry.method, proxyPath, map);
+              expect(foundAtProxy).not.toBeNull();
+              expect(foundAtProxy!.path).toBe(originalPath);
+              
+              // Entry should NOT be accessible at original path (unless original path happens to start with /proxy)
+              if (!originalPath.startsWith(PROXY_PREFIX)) {
+                const foundAtOriginal = findMatchingEntry(entry.method, originalPath, map);
+                expect(foundAtOriginal).toBeNull();
+              }
+            }
+            
+            return true;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('getProxyPath should always prepend /proxy prefix', () => {
+      fc.assert(
+        fc.property(pathArb, (path) => {
+          const proxyPath = getProxyPath(path);
+          
+          expect(proxyPath).toBe(PROXY_PREFIX + path);
+          expect(proxyPath.startsWith(PROXY_PREFIX)).toBe(true);
+          
+          return true;
+        }),
+        { numRuns: 100 }
+      );
+    });
+  });
+
+  /**
+   * **Feature: har-proxy, Property 4: Request-Response Matching**
+   * *For any* registered endpoint entry, sending an HTTP request with the same
+   * method and proxy-prefixed path SHALL return the recorded response with matching status code.
+   * **Validates: Requirements 3.1**
+   */
+  describe('Property 4: Request-Response Matching', () => {
+    it('should return matching entry for registered method and proxy-prefixed path', () => {
+      fc.assert(
+        fc.property(
+          fc.array(harEntryArb, { minLength: 1, maxLength: 10 }),
+          (entries) => {
+            const map = buildEndpointMap(entries);
+            
+            // For each entry, verify we can find it by method and proxy-prefixed path
+            for (const entry of entries) {
+              const proxyPath = getProxyPath(entry.path);
+              const found = findMatchingEntry(entry.method, proxyPath, map);
               
               // Should find an entry (might be different if duplicates exist)
               expect(found).not.toBeNull();
               
-              // The found entry should have matching method and path
+              // The found entry should have matching method and original path
               expect(found!.method).toBe(entry.method);
               expect(found!.path).toBe(entry.path);
             }
@@ -83,12 +141,12 @@ describe('Mock Server', () => {
 
   /**
    * **Feature: har-proxy, Property 5: Unmatched Request Returns 404**
-   * *For any* HTTP request where the method and path combination does not exist
+   * *For any* HTTP request to `/proxy/*` where the method and path combination does not exist
    * in the endpoint registry, the Mock_Server SHALL return a 404 status code.
    * **Validates: Requirements 3.2**
    */
   describe('Property 5: Unmatched Request Returns 404', () => {
-    it('should return null for non-existent method/path combinations', () => {
+    it('should return null for non-existent method/path combinations under /proxy', () => {
       fc.assert(
         fc.property(
           fc.array(harEntryArb, { minLength: 0, maxLength: 5 }),
@@ -97,15 +155,18 @@ describe('Mock Server', () => {
           (entries, queryMethod, queryPath) => {
             const map = buildEndpointMap(entries);
             
-            // Check if this method/path combination exists in entries
+            // Query using proxy-prefixed path
+            const proxyQueryPath = getProxyPath(queryPath);
+            
+            // Check if this method/path combination exists in entries (using original path)
             const exists = entries.some(
               (e) => e.method === queryMethod && e.path === queryPath
             );
             
-            const found = findMatchingEntry(queryMethod, queryPath, map);
+            const found = findMatchingEntry(queryMethod, proxyQueryPath, map);
             
             if (exists) {
-              // If it exists, we should find it
+              // If it exists, we should find it at the proxy path
               expect(found).not.toBeNull();
             } else {
               // If it doesn't exist, we should get null (which triggers 404)
@@ -150,7 +211,9 @@ describe('Mock Server', () => {
             }));
 
             const map = buildEndpointMap(entries);
-            const found = findMatchingEntry(method, path, map);
+            // Query using proxy-prefixed path
+            const proxyPath = getProxyPath(path);
+            const found = findMatchingEntry(method, proxyPath, map);
 
             // Should return the last entry
             expect(found).not.toBeNull();
@@ -178,7 +241,9 @@ describe('Mock Server', () => {
       fc.assert(
         fc.property(harEntryArb, (entry) => {
           const map = buildEndpointMap([entry]);
-          const found = findMatchingEntry(entry.method, entry.path, map);
+          // Query using proxy-prefixed path
+          const proxyPath = getProxyPath(entry.path);
+          const found = findMatchingEntry(entry.method, proxyPath, map);
 
           expect(found).not.toBeNull();
           

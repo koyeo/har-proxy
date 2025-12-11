@@ -100,13 +100,21 @@ interface ServerConfig {
 }
 
 interface EndpointMap {
-  [key: string]: HarEntry; // key format: "METHOD:path"
+  [key: string]: HarEntry; // key format: "METHOD:/proxy{path}"
 }
+
+const PROXY_PREFIX = '/proxy';
 
 function createServer(config: ServerConfig): http.Server;
 function buildEndpointMap(entries: HarEntry[]): EndpointMap;
 function findMatchingEntry(method: string, path: string, map: EndpointMap): HarEntry | null;
+function getProxyPath(originalPath: string): string; // Returns "/proxy" + originalPath
 ```
+
+**Routing Strategy:**
+- All HAR-recorded endpoints are prefixed with `/proxy` to avoid conflicts with internal routes
+- Dashboard is served at `/` (internal route)
+- HAR endpoints are served at `/proxy/*` (e.g., `/api/users` → `/proxy/api/users`)
 
 ### 4. Dashboard Module (`src/dashboard.ts`)
 
@@ -201,15 +209,21 @@ interface EndpointRegistry {
 
 ### Property 4: Request-Response Matching
 
-*For any* registered endpoint entry, sending an HTTP request with the same method and path SHALL return the recorded response with matching status code.
+*For any* registered endpoint entry, sending an HTTP request with the same method and proxy-prefixed path (`/proxy` + original path) SHALL return the recorded response with matching status code.
 
 **Validates: Requirements 3.1**
 
 ### Property 5: Unmatched Request Returns 404
 
-*For any* HTTP request where the method and path combination does not exist in the endpoint registry, the Mock_Server SHALL return a 404 status code.
+*For any* HTTP request to `/proxy/*` where the method and path combination does not exist in the endpoint registry, the Mock_Server SHALL return a 404 status code.
 
 **Validates: Requirements 3.2**
+
+### Property 11: Proxy Path Prefix Consistency
+
+*For any* HAR entry with path P, the endpoint SHALL be registered and accessible at `/proxy` + P, ensuring no conflicts with internal routes.
+
+**Validates: Requirements 3.6**
 
 ### Property 6: Latest Entry Wins
 
@@ -225,7 +239,7 @@ interface EndpointRegistry {
 
 ### Property 8: Dashboard Displays Complete Endpoint Info
 
-*For any* set of registered entries, the generated dashboard HTML SHALL contain the method, path, status code, and content-type for every entry.
+*For any* set of registered entries, the generated dashboard HTML SHALL contain the method, proxy-prefixed path (`/proxy` + original path), status code, and content-type for every entry.
 
 **Validates: Requirements 4.2, 4.3, 4.4**
 
@@ -286,13 +300,14 @@ Key property tests:
 1. **HAR Parsing Completeness** - Generate random HAR structures, verify all data is extracted
 2. **Base64 Round-Trip** - Generate random strings, encode/decode, verify equality
 3. **Entry Text Representation** - Generate entries, format/parse, verify equivalence
-4. **Request-Response Matching** - Generate entries, register, request, verify response
-5. **404 for Unmatched** - Generate entries and non-matching requests, verify 404
+4. **Request-Response Matching** - Generate entries, register, request at `/proxy/*`, verify response
+5. **404 for Unmatched** - Generate entries and non-matching requests to `/proxy/*`, verify 404
 6. **Latest Entry Wins** - Generate duplicate entries, verify last one is returned
 7. **Response Fidelity** - Generate entries with headers/body, verify exact match
-8. **Dashboard Completeness** - Generate entries, verify all info in HTML output
+8. **Dashboard Completeness** - Generate entries, verify all info including proxy paths in HTML output
 9. **Dashboard Grouping** - Generate entries with shared base paths, verify grouping
 10. **Endpoint Count** - Generate entries, verify displayed count matches
+11. **Proxy Path Prefix** - Generate entries, verify all are accessible at `/proxy` + original path
 
 ### Integration Tests
 

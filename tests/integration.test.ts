@@ -55,8 +55,8 @@ describe('Integration Tests', () => {
   });
 
   describe('Server responses', () => {
-    it('should return correct response for GET /users', async () => {
-      const response = await fetch(`http://localhost:${port}/users`);
+    it('should return correct response for GET /proxy/users', async () => {
+      const response = await fetch(`http://localhost:${port}/proxy/users`);
       
       expect(response.status).toBe(200);
       expect(response.headers.get('content-type')).toContain('application/json');
@@ -65,8 +65,8 @@ describe('Integration Tests', () => {
       expect(body).toBe('[{"id":1,"name":"John"}]');
     });
 
-    it('should return correct response for POST /users', async () => {
-      const response = await fetch(`http://localhost:${port}/users`, {
+    it('should return correct response for POST /proxy/users', async () => {
+      const response = await fetch(`http://localhost:${port}/proxy/users`, {
         method: 'POST',
       });
       
@@ -76,15 +76,23 @@ describe('Integration Tests', () => {
       expect(body).toBe('{"id":2,"name":"Jane"}');
     });
 
-    it('should return 404 for non-existent endpoint', async () => {
-      const response = await fetch(`http://localhost:${port}/nonexistent`);
+    it('should return 404 for non-existent endpoint under /proxy', async () => {
+      const response = await fetch(`http://localhost:${port}/proxy/nonexistent`);
       
       expect(response.status).toBe(404);
+    });
+
+    it('should return 404 for paths not under /proxy', async () => {
+      const response = await fetch(`http://localhost:${port}/users`);
+      
+      expect(response.status).toBe(404);
+      const body = await response.json();
+      expect(body.message).toContain('/proxy');
     });
   });
 
   describe('Dashboard', () => {
-    it('should serve dashboard at root path', async () => {
+    it('should serve dashboard at root path with proxy-prefixed paths', async () => {
       const response = await fetch(`http://localhost:${port}/`);
       
       expect(response.status).toBe(200);
@@ -92,21 +100,21 @@ describe('Integration Tests', () => {
       
       const html = await response.text();
       expect(html).toContain('HAR Proxy Dashboard');
-      expect(html).toContain('/users');
-      expect(html).toContain('/products/123');
+      expect(html).toContain('/proxy/users');
+      expect(html).toContain('/proxy/products/123');
       expect(html).toContain('GET');
       expect(html).toContain('POST');
     });
   });
 
   describe('Endpoint grouping', () => {
-    it('should group endpoints by base path in dashboard', async () => {
+    it('should group endpoints by base path in dashboard with proxy prefix', async () => {
       const result = await parseHarFile(harFilePath);
       const html = generateDashboard(result.entries);
       
-      // Should have groups for /users and /products
-      expect(html).toContain('/users');
-      expect(html).toContain('/products');
+      // Should have groups for /proxy/users and /proxy/products
+      expect(html).toContain('/proxy/users');
+      expect(html).toContain('/proxy/products');
     });
   });
 });

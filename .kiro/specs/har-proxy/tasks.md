@@ -1,117 +1,38 @@
 # Implementation Plan
 
-- [x] 1. Set up project structure and dependencies
-  - Initialize TypeScript configuration with ES modules
-  - Install dependencies: commander (CLI), fast-check (PBT), vitest (testing)
-  - Create directory structure: `src/`, `src/types/`, `tests/`
-  - Configure package.json with bin entry for `har-proxy` command
-  - _Requirements: 1.1, 5.1, 5.2_
+- [x] 1. Update Mock Server to use /proxy path prefix
+  - [x] 1.1 Add PROXY_PREFIX constant and getProxyPath helper function
+    - Add `const PROXY_PREFIX = '/proxy'` to server module
+    - Implement `getProxyPath(originalPath: string): string` function
+    - _Requirements: 3.6_
+  - [x] 1.2 Update buildEndpointMap to prefix paths with /proxy
+    - Modify endpoint key format from `"METHOD:path"` to `"METHOD:/proxy{path}"`
+    - _Requirements: 3.1, 3.6_
+  - [x] 1.3 Update request handler routing logic
+    - Keep dashboard at `/` (internal route)
+    - Route `/proxy/*` requests to HAR endpoint matching
+    - Return 404 for non-proxy paths that aren't internal routes
+    - _Requirements: 3.1, 3.2, 3.6_
+  - [x] 1.4 Write property test for proxy path prefix consistency
+    - **Property 11: Proxy Path Prefix Consistency**
+    - **Validates: Requirements 3.6**
+  - [x] 1.5 Update Dashboard to display proxy-prefixed paths
+    - Show full `/proxy/*` paths in endpoint list
+    - _Requirements: 4.2_
+  - [x] 1.6 Update existing tests to use /proxy paths
+    - Fix integration tests and server tests to request `/proxy/*` endpoints
+    - _Requirements: 3.1, 3.2_
 
-- [x] 2. Implement HAR Parser module
-  - [x] 2.1 Create type definitions for HAR file structure and internal models
-    - Define HarFile, HarLogEntry, HarEntry, ParseResult interfaces
-    - _Requirements: 2.1, 2.2, 2.4_
-  - [x] 2.2 Implement HAR file parsing logic
-    - Read file from disk and parse JSON
-    - Extract request data (method, URL, headers, query params)
-    - Extract response data (status, headers, body, content-type)
-    - Handle base64 encoded response bodies
-    - _Requirements: 2.1, 2.2, 2.3_
-  - [x] 2.3 Write property test for HAR parsing completeness
-    - **Property 1: HAR Parsing Completeness**
-    - **Validates: Requirements 2.1, 2.2**
-  - [x] 2.4 Write property test for base64 decoding round-trip
-    - **Property 2: Base64 Decoding Round-Trip**
-    - **Validates: Requirements 2.3**
-  - [x] 2.5 Implement entry text representation (formatEntry)
-    - Generate human-readable string for each entry
-    - _Requirements: 2.5_
-  - [x] 2.6 Write property test for entry text representation round-trip
-    - **Property 3: Entry Text Representation Round-Trip**
-    - **Validates: Requirements 2.5**
-
-- [x] 3. Checkpoint
+- [x] 2. Checkpoint
   - Ensure all tests pass, ask the user if questions arise.
 
-- [x] 4. Implement Mock Server module
-  - [x] 4.1 Create endpoint registry and route matching logic
-    - Build endpoint map from parsed entries (key: "METHOD:path")
-    - Implement findMatchingEntry functionæ
-    - Handle duplicate entries (latest wins)
-    - _Requirements: 3.1, 3.2, 3.3_
-  - [x] 4.2 Write property test for request-response matching
-    - **Property 4: Request-Response Matching**
-    - **Validates: Requirements 3.1**
-  - [x] 4.3 Write property test for unmatched requests returning 404
-    - **Property 5: Unmatched Request Returns 404**
-    - **Validates: Requirements 3.2**
-  - [x] 4.4 Write property test for latest entry wins behavior
-    - **Property 6: Latest Entry Wins**
-    - **Validates: Requirements 3.3**
-  - [x] 4.5 Implement HTTP server with response handler
-    - Create HTTP server using Node.js http module
-    - Match incoming requests to registered entries
-    - Return recorded response with headers and body
-    - Return 404 for unmatched requests
-    - _Requirements: 3.1, 3.2, 3.4, 3.5_
-  - [x] 4.6 Write property test for response fidelity
-    - **Property 7: Response Fidelity**
-    - **Validates: Requirements 3.4, 3.5**
+## Previously Completed Tasks (Reference Only)
 
-- [x] 5. Checkpoint
-  - Ensure all tests pass, ask the user if questions arise.
+The following tasks were completed in the initial implementation:
 
-- [x] 6. Implement Dashboard module
-  - [x] 6.1 Implement endpoint grouping logic
-    - Group entries by base path (first path segment)
-    - Sort groups and endpoints within groups
-    - _Requirements: 4.5_
-  - [x] 6.2 Write property test for dashboard grouping
-    - **Property 9: Dashboard Groups by Base Path**
-    - **Validates: Requirements 4.5**
-  - [x] 6.3 Implement HTML dashboard generation
-    - Generate HTML page listing all endpoints
-    - Display method, path, status code, content-type for each
-    - Apply grouping by base path
-    - _Requirements: 4.1, 4.2, 4.3, 4.4_
-  - [x] 6.4 Write property test for dashboard completeness
-    - **Property 8: Dashboard Displays Complete Endpoint Info**
-    - **Validates: Requirements 4.2, 4.3, 4.4**
-  - [x] 6.5 Integrate dashboard route into server
-    - Serve dashboard HTML at root path `/`
-    - _Requirements: 4.1_
-
-- [x] 7. Checkpoint
-  - Ensure all tests pass, ask the user if questions arise.
-
-- [x] 8. Implement CLI module
-  - [x] 8.1 Implement argument parsing with commander
-    - Parse positional argument for HAR file path
-    - Parse --port option with default value 3000
-    - Implement --help and --version flags
-    - _Requirements: 1.1, 1.5, 5.1, 5.2_
-  - [x] 8.2 Implement CLI orchestration and error handling
-    - Validate HAR file exists
-    - Handle parsing errors with clear messages
-    - Display server address and port on startup
-    - Display endpoint count on startup
-    - _Requirements: 1.2, 1.3, 1.4, 5.3_
-  - [x] 8.3 Write property test for endpoint count accuracy
-    - **Property 10: Endpoint Count Accuracy**
-    - **Validates: Requirements 5.3**
-  - [x] 8.4 Implement request logging
-    - Log method, path, and response status for each request
-    - _Requirements: 5.4_
-
-- [x] 9. Final integration and wiring
-  - [x] 9.1 Wire all modules together in main entry point
-    - Connect CLI → Parser → Server → Dashboard
-    - Export bin command in package.json
-    - _Requirements: 1.1_
-  - [x] 9.2 Write integration tests for end-to-end flow
-    - Test complete flow from HAR file to server response
-    - Test dashboard accessibility
-    - _Requirements: 1.1, 4.1_
-
-- [x] 10. Final Checkpoint
-  - Ensure all tests pass, ask the user if questions arise.
+- [x] Set up project structure and dependencies
+- [x] Implement HAR Parser module (type definitions, parsing logic, formatEntry)
+- [x] Implement Mock Server module (endpoint registry, route matching, HTTP server)
+- [x] Implement Dashboard module (grouping logic, HTML generation)
+- [x] Implement CLI module (argument parsing, orchestration, logging)
+- [x] Final integration and wiring

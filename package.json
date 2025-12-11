@@ -1,17 +1,22 @@
 {
   "name": "har-proxy",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A CLI tool that parses HAR files and creates a RESTful mock server",
   "type": "module",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "bin": {
     "har-proxy": "./dist/cli.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "vitest --run",
     "test:watch": "vitest",
-    "start": "node dist/cli.js"
+    "start": "node dist/cli.js",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "har",
