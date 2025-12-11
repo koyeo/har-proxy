@@ -82,13 +82,27 @@ export function getEndpointCount(map: EndpointMap): number {
 export type RequestLogger = (method: string, path: string, status: number) => void;
 
 /**
- * Applies CORS headers to a response
+ * Checks if a header exists in the headers object (case-insensitive)
+ */
+function hasHeader(headers: Record<string, string>, headerName: string): boolean {
+  const lowerName = headerName.toLowerCase();
+  return Object.keys(headers).some(key => key.toLowerCase() === lowerName);
+}
+
+/**
+ * Applies CORS headers to a response (only if not already present)
  * @param headers - The headers object to add CORS headers to
  */
 export function applyCorsHeaders(headers: Record<string, string>): void {
-  headers['Access-Control-Allow-Origin'] = DEFAULT_CORS_HEADERS['Access-Control-Allow-Origin'];
-  headers['Access-Control-Allow-Methods'] = DEFAULT_CORS_HEADERS['Access-Control-Allow-Methods'];
-  headers['Access-Control-Allow-Headers'] = DEFAULT_CORS_HEADERS['Access-Control-Allow-Headers'];
+  if (!hasHeader(headers, 'Access-Control-Allow-Origin')) {
+    headers['Access-Control-Allow-Origin'] = DEFAULT_CORS_HEADERS['Access-Control-Allow-Origin'];
+  }
+  if (!hasHeader(headers, 'Access-Control-Allow-Methods')) {
+    headers['Access-Control-Allow-Methods'] = DEFAULT_CORS_HEADERS['Access-Control-Allow-Methods'];
+  }
+  if (!hasHeader(headers, 'Access-Control-Allow-Headers')) {
+    headers['Access-Control-Allow-Headers'] = DEFAULT_CORS_HEADERS['Access-Control-Allow-Headers'];
+  }
 }
 
 /**
@@ -124,8 +138,8 @@ export function createRequestHandler(
       return;
     }
 
-    // Handle preflight OPTIONS requests for CORS
-    if (method === 'OPTIONS' && cors && path.startsWith(PROXY_PREFIX)) {
+    // Handle preflight OPTIONS requests for CORS (for all paths when CORS is enabled)
+    if (method === 'OPTIONS' && cors) {
       handlePreflightRequest(res);
       logger?.(method, path, 204);
       return;

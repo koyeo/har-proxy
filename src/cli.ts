@@ -5,14 +5,30 @@
  */
 
 import { Command } from 'commander';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { ServerResponse } from 'node:http';
 import { parseHarFile } from './parser.js';
 import { createServer, startServer, buildEndpointMap, getEndpointCount } from './server.js';
 import { generateDashboard } from './dashboard.js';
 
-const VERSION = '1.0.0';
+/**
+ * Get version from package.json
+ */
+function getVersion(): string {
+  try {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const packagePath = join(__dirname, '..', 'package.json');
+    const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'));
+    return packageJson.version || '1.0.0';
+  } catch {
+    return '1.0.0';
+  }
+}
+
+const VERSION = getVersion();
 
 /**
  * Creates the CLI program with commander

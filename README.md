@@ -58,10 +58,11 @@ By default, har-proxy automatically adds CORS headers to all responses, allowing
 
 The server also handles preflight OPTIONS requests automatically.
 
+**Note:** If your HAR file already contains CORS headers, har-proxy will preserve them and not add duplicates.
+
 ### Disabling CORS
 
 Use `--no-cors` when:
-- Your HAR file already contains custom CORS headers you want to preserve
 - You need to test CORS behavior with specific origins
 - Your frontend handles CORS differently
 
@@ -90,6 +91,18 @@ This design separates HAR endpoints from internal routes (dashboard, health chec
 | `/api/users` | `/proxy/api/users` |
 | `/api/products/123` | `/proxy/api/products/123` |
 | `/v1/auth/login` | `/proxy/v1/auth/login` |
+
+### Query Parameters
+
+Query parameters in requests are automatically stripped for matching purposes. This means:
+
+```bash
+# Both of these will match the same HAR entry for GET /api/users
+curl http://localhost:3000/proxy/api/users
+curl http://localhost:3000/proxy/api/users?page=1&limit=10
+```
+
+This allows flexible testing without needing exact query parameter matches.
 
 ## Dashboard
 

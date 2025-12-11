@@ -90,7 +90,7 @@
     - Test URL without query parameters (should return unchanged)
     - _Requirements: 3.7_
 
-- [ ] 7. Checkpoint
+- [x] 7. Checkpoint
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Previously Completed Tasks (Reference Only)
