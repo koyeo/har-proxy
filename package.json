@@ -1,6 +1,6 @@
 {
   "name": "har-proxy",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A CLI tool that parses HAR files and creates a RESTful mock server",
   "type": "module",
   "main": "dist/index.js",
