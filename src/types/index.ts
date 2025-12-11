@@ -66,12 +66,21 @@ export interface CLIOptions {
   port: number;
   help: boolean;
   version: boolean;
+  cors: boolean; // true by default, false when --no-cors is specified
+}
+
+// CORS Headers
+export interface CorsHeaders {
+  'Access-Control-Allow-Origin': string;
+  'Access-Control-Allow-Methods': string;
+  'Access-Control-Allow-Headers': string;
 }
 
 // Server Configuration
 export interface ServerConfig {
   port: number;
   entries: HarEntry[];
+  cors: boolean; // Enable/disable automatic CORS header injection
 }
 
 export interface EndpointMap {

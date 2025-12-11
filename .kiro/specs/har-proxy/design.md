@@ -46,6 +46,7 @@ interface CLIOptions {
   port: number;
   help: boolean;
   version: boolean;
+  cors: boolean; // true by default, false when --no-cors is specified
 }
 
 function parseArgs(args: string[]): CLIOptions;
@@ -97,18 +98,32 @@ Creates and manages the HTTP mock server.
 interface ServerConfig {
   port: number;
   entries: HarEntry[];
+  cors: boolean; // Enable/disable automatic CORS header injection
 }
 
 interface EndpointMap {
   [key: string]: HarEntry; // key format: "METHOD:/proxy{path}"
 }
 
+interface CorsHeaders {
+  'Access-Control-Allow-Origin': string;
+  'Access-Control-Allow-Methods': string;
+  'Access-Control-Allow-Headers': string;
+}
+
 const PROXY_PREFIX = '/proxy';
+const DEFAULT_CORS_HEADERS: CorsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With'
+};
 
 function createServer(config: ServerConfig): http.Server;
 function buildEndpointMap(entries: HarEntry[]): EndpointMap;
 function findMatchingEntry(method: string, path: string, map: EndpointMap): HarEntry | null;
 function getProxyPath(originalPath: string): string; // Returns "/proxy" + originalPath
+function handlePreflightRequest(res: ServerResponse): void; // Handles OPTIONS preflight requests
+function applyCorsHeaders(res: ServerResponse, headers: Record<string, string>): void; // Adds CORS headers to response
 ```
 
 **Routing Strategy:**
@@ -255,6 +270,24 @@ interface EndpointRegistry {
 
 **Validates: Requirements 5.3**
 
+### Property 12: CORS Headers Included by Default
+
+*For any* HTTP request to the Mock_Server when CORS is enabled (default), the response SHALL include Access-Control-Allow-Origin, Access-Control-Allow-Methods, and Access-Control-Allow-Headers headers.
+
+**Validates: Requirements 6.1**
+
+### Property 13: Preflight OPTIONS Request Handling
+
+*For any* OPTIONS request to a `/proxy/*` path when CORS is enabled, the Mock_Server SHALL respond with a 204 status code and include all required CORS headers.
+
+**Validates: Requirements 6.2**
+
+### Property 14: CORS Disabled Preserves Original Headers
+
+*For any* HAR entry containing CORS headers, when CORS is disabled via `--no-cors`, the Mock_Server SHALL not inject automatic CORS headers but SHALL preserve the original CORS headers from the HAR recording.
+
+**Validates: Requirements 6.3, 6.4**
+
 ## Error Handling
 
 ### File System Errors
@@ -308,6 +341,9 @@ Key property tests:
 9. **Dashboard Grouping** - Generate entries with shared base paths, verify grouping
 10. **Endpoint Count** - Generate entries, verify displayed count matches
 11. **Proxy Path Prefix** - Generate entries, verify all are accessible at `/proxy` + original path
+12. **CORS Headers by Default** - Generate requests, verify CORS headers present when enabled
+13. **Preflight OPTIONS Handling** - Generate OPTIONS requests, verify 204 response with CORS headers
+14. **CORS Disabled Preserves Original** - Generate entries with CORS headers, disable CORS, verify original headers preserved
 
 ### Integration Tests
 

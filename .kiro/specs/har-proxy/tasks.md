@@ -26,6 +26,51 @@
 - [x] 2. Checkpoint
   - Ensure all tests pass, ask the user if questions arise.
 
+- [x] 3. Implement configurable CORS support
+  - [x] 3.1 Add CORS types and constants to server module
+    - Add `CorsHeaders` interface to types
+    - Add `DEFAULT_CORS_HEADERS` constant with Access-Control-Allow-Origin, Methods, Headers
+    - Update `ServerConfig` interface to include `cors: boolean`
+    - _Requirements: 6.1_
+  - [x] 3.2 Implement CORS header injection in request handler
+    - Create `applyCorsHeaders()` function to add CORS headers to responses
+    - Modify request handler to inject CORS headers when `cors` is enabled
+    - Ensure CORS headers are added to all responses (success, 404, errors)
+    - _Requirements: 6.1_
+  - [x] 3.3 Implement preflight OPTIONS request handling
+    - Create `handlePreflightRequest()` function
+    - Add OPTIONS method handling in request handler
+    - Return 204 status with CORS headers for preflight requests
+    - _Requirements: 6.2_
+  - [x] 3.4 Write property test for CORS headers by default
+    - **Property 12: CORS Headers Included by Default**
+    - **Validates: Requirements 6.1**
+  - [x] 3.5 Write property test for preflight OPTIONS handling
+    - **Property 13: Preflight OPTIONS Request Handling**
+    - **Validates: Requirements 6.2**
+  - [x] 3.6 Implement --no-cors CLI option
+    - Add `cors` option to CLI argument parser (default: true)
+    - Pass `cors` config to server creation
+    - Update help text to document --no-cors option
+    - _Requirements: 6.3, 6.5_
+  - [x] 3.7 Ensure original HAR CORS headers preserved when CORS disabled
+    - When `cors: false`, skip automatic CORS header injection
+    - Preserve any CORS headers from original HAR response headers
+    - _Requirements: 6.4_
+  - [x] 3.8 Write property test for CORS disabled preserves original headers
+    - **Property 14: CORS Disabled Preserves Original Headers**
+    - **Validates: Requirements 6.3, 6.4**
+
+- [x] 4. Update README.md documentation
+  - [x] 4.1 Update Usage section with --no-cors option
+    - Add --no-cors to options table
+    - Add example showing --no-cors usage
+    - Explain when to use --no-cors (custom CORS handling)
+    - _Requirements: 6.5_
+
+- [x] 5. Final Checkpoint
+  - Ensure all tests pass, ask the user if questions arise.
+
 ## Previously Completed Tasks (Reference Only)
 
 The following tasks were completed in the initial implementation:

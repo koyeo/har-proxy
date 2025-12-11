@@ -4,7 +4,16 @@
  */
 
 import { createServer as createHttpServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
-import type { HarEntry, ServerConfig, EndpointMap } from './types/index.js';
+import type { HarEntry, ServerConfig, EndpointMap, CorsHeaders } from './types/index.js';
+
+/**
+ * Default CORS headers for cross-origin requests
+ */
+export const DEFAULT_CORS_HEADERS: CorsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With'
+};
 
 /**
  * Proxy path prefix for all HAR-recorded endpoints
@@ -63,11 +72,33 @@ export function getEndpointCount(map: EndpointMap): number {
 export type RequestLogger = (method: string, path: string, status: number) => void;
 
 /**
+ * Applies CORS headers to a response
+ * @param headers - The headers object to add CORS headers to
+ */
+export function applyCorsHeaders(headers: Record<string, string>): void {
+  headers['Access-Control-Allow-Origin'] = DEFAULT_CORS_HEADERS['Access-Control-Allow-Origin'];
+  headers['Access-Control-Allow-Methods'] = DEFAULT_CORS_HEADERS['Access-Control-Allow-Methods'];
+  headers['Access-Control-Allow-Headers'] = DEFAULT_CORS_HEADERS['Access-Control-Allow-Headers'];
+}
+
+/**
+ * Handles preflight OPTIONS requests for CORS
+ * @param res - The server response object
+ */
+export function handlePreflightRequest(res: ServerResponse): void {
+  const headers: Record<string, string> = {};
+  applyCorsHeaders(headers);
+  res.writeHead(204, headers);
+  res.end();
+}
+
+/**
  * Creates the HTTP request handler
  */
 export function createRequestHandler(
   endpointMap: EndpointMap,
   dashboardHandler: (res: ServerResponse) => void,
+  cors: boolean = true,
   logger?: RequestLogger
 ) {
   return (req: IncomingMessage, res: ServerResponse) => {
@@ -82,9 +113,20 @@ export function createRequestHandler(
       return;
     }
 
+    // Handle preflight OPTIONS requests for CORS
+    if (method === 'OPTIONS' && cors && path.startsWith(PROXY_PREFIX)) {
+      handlePreflightRequest(res);
+      logger?.(method, path, 204);
+      return;
+    }
+
     // Only handle requests under /proxy/* for HAR endpoints
     if (!path.startsWith(PROXY_PREFIX)) {
-      res.writeHead(404, { 'Content-Type': 'application/json' });
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (cors) {
+        applyCorsHeaders(headers);
+      }
+      res.writeHead(404, headers);
       res.end(JSON.stringify({ 
         error: 'Not Found', 
         message: `Path ${path} is not a proxy endpoint. HAR endpoints are available under ${PROXY_PREFIX}/*` 
@@ -97,7 +139,11 @@ export function createRequestHandler(
     const entry = findMatchingEntry(method, path, endpointMap);
 
     if (!entry) {
-      res.writeHead(404, { 'Content-Type': 'application/json' });
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (cors) {
+        applyCorsHeaders(headers);
+      }
+      res.writeHead(404, headers);
       res.end(JSON.stringify({ error: 'Not Found', message: `No matching entry for ${method} ${path}` }));
       logger?.(method, path, 404);
       return;
@@ -120,6 +166,11 @@ export function createRequestHandler(
       headers['Content-Type'] = entry.contentType;
     }
 
+    // Apply CORS headers if enabled
+    if (cors) {
+      applyCorsHeaders(headers);
+    }
+
     res.writeHead(entry.status, headers);
     res.end(entry.responseBody);
     logger?.(method, path, entry.status);
@@ -135,7 +186,8 @@ export function createServer(
   logger?: RequestLogger
 ): Server {
   const endpointMap = buildEndpointMap(config.entries);
-  const handler = createRequestHandler(endpointMap, dashboardHandler, logger);
+  const cors = config.cors ?? true; // Default to true if not specified
+  const handler = createRequestHandler(endpointMap, dashboardHandler, cors, logger);
   
   return createHttpServer(handler);
 }

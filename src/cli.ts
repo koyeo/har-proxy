@@ -26,8 +26,9 @@ export function createProgram(): Command {
     .version(VERSION)
     .argument('<har-file>', 'Path to the HAR file to load')
     .option('-p, --port <number>', 'Port to run the server on', '3000')
-    .action(async (harFile: string, options: { port: string }) => {
-      await runServer(harFile, parseInt(options.port, 10));
+    .option('--no-cors', 'Disable automatic CORS header injection (preserves original HAR CORS headers)')
+    .action(async (harFile: string, options: { port: string; cors: boolean }) => {
+      await runServer(harFile, parseInt(options.port, 10), options.cors);
     });
 
   return program;
@@ -65,7 +66,7 @@ export function createLogger(): (method: string, path: string, status: number) =
 /**
  * Main function to run the server
  */
-export async function runServer(harFilePath: string, port: number): Promise<void> {
+export async function runServer(harFilePath: string, port: number, cors: boolean = true): Promise<void> {
   // Validate HAR file
   const validation = validateHarFile(harFilePath);
   if (!validation.valid) {
@@ -99,13 +100,14 @@ export async function runServer(harFilePath: string, port: number): Promise<void
 
   // Create and start server
   const logger = createLogger();
-  const server = createServer({ port, entries: result.entries }, dashboardHandler, logger);
+  const server = createServer({ port, entries: result.entries, cors }, dashboardHandler, logger);
 
   try {
     await startServer(server, port);
     console.log(`\n🚀 HAR Proxy server running at http://localhost:${port}`);
     console.log(`📊 Dashboard available at http://localhost:${port}/`);
     console.log(`📦 Loaded ${endpointCount} endpoint${endpointCount !== 1 ? 's' : ''}`);
+    console.log(`🌐 CORS: ${cors ? 'enabled (default)' : 'disabled'}`);
     console.log('\nPress Ctrl+C to stop the server\n');
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

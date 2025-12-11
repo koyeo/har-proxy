@@ -13,6 +13,8 @@ har-proxy is a terminal command-line tool that parses HAR (HTTP Archive) files e
 - **CLI**: Command-line interface, the entry point for user interaction with the har-proxy tool
 - **Entry**: A single request/response record in a HAR file
 - **Proxy Path Prefix**: The `/proxy` prefix added to all HAR-recorded endpoints to separate them from internal routes (Dashboard, health checks, etc.)
+- **CORS (Cross-Origin Resource Sharing)**: A browser security mechanism that controls how web pages can request resources from different domains
+- **Preflight Request**: An OPTIONS request sent by browsers before certain cross-origin requests to check if the actual request is safe to send
 
 ## Requirements
 
@@ -75,3 +77,15 @@ har-proxy is a terminal command-line tool that parses HAR (HTTP Archive) files e
 2. WHEN a user executes `har-proxy --version` THEN the CLI SHALL display the current version number
 3. WHEN the Mock_Server is running THEN the CLI SHALL display the number of endpoints loaded from the HAR file
 4. WHEN a request is received by the Mock_Server THEN the CLI SHALL log the request method, path, and response status
+
+### Requirement 6
+
+**User Story:** As a developer, I want the mock server to handle cross-domain requests by default, so that I can test my frontend application from different origins without CORS issues.
+
+#### Acceptance Criteria
+
+1. WHEN the Mock_Server receives a request THEN the Mock_Server SHALL include CORS headers (Access-Control-Allow-Origin, Access-Control-Allow-Methods, Access-Control-Allow-Headers) in the response by default
+2. WHEN a client sends a preflight OPTIONS request THEN the Mock_Server SHALL respond with appropriate CORS headers and a 204 status code
+3. WHERE the user specifies `--no-cors` option THEN the Mock_Server SHALL disable automatic CORS header injection
+4. WHEN CORS is disabled via `--no-cors` THEN the Mock_Server SHALL preserve any CORS headers that exist in the original HAR recorded responses
+5. WHEN the CLI displays help information THEN the CLI SHALL document the `--no-cors` option and its purpose

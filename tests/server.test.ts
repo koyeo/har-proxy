@@ -10,8 +10,12 @@ import {
   getEndpointCount,
   getProxyPath,
   PROXY_PREFIX,
+  DEFAULT_CORS_HEADERS,
+  applyCorsHeaders,
+  createRequestHandler,
 } from '../src/server.js';
-import type { HarEntry } from '../src/types/index.js';
+import type { HarEntry, EndpointMap } from '../src/types/index.js';
+import type { ServerResponse } from 'node:http';
 
 // Generators for server tests
 const httpMethodArb = fc.constantFrom('GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS');
@@ -291,6 +295,324 @@ describe('Mock Server', () => {
             
             expect(count).toBe(uniqueKeys.size);
 
+            return true;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+  });
+
+
+  /**
+   * **Feature: har-proxy, Property 12: CORS Headers Included by Default**
+   * *For any* HTTP request to the Mock_Server when CORS is enabled (default),
+   * the response SHALL include Access-Control-Allow-Origin, Access-Control-Allow-Methods,
+   * and Access-Control-Allow-Headers headers.
+   * **Validates: Requirements 6.1**
+   */
+  describe('Property 12: CORS Headers Included by Default', () => {
+    it('should add all CORS headers when applyCorsHeaders is called', () => {
+      fc.assert(
+        fc.property(
+          fc.record({
+            'Content-Type': fc.constantFrom('application/json', 'text/html', 'text/plain'),
+          }),
+          (initialHeaders) => {
+            const headers: Record<string, string> = { ...initialHeaders };
+            applyCorsHeaders(headers);
+            
+            // Verify all CORS headers are present
+            expect(headers['Access-Control-Allow-Origin']).toBe(DEFAULT_CORS_HEADERS['Access-Control-Allow-Origin']);
+            expect(headers['Access-Control-Allow-Methods']).toBe(DEFAULT_CORS_HEADERS['Access-Control-Allow-Methods']);
+            expect(headers['Access-Control-Allow-Headers']).toBe(DEFAULT_CORS_HEADERS['Access-Control-Allow-Headers']);
+            
+            // Original headers should still be present
+            expect(headers['Content-Type']).toBe(initialHeaders['Content-Type']);
+            
+            return true;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should include CORS headers in responses when cors is enabled', () => {
+      fc.assert(
+        fc.property(
+          harEntryArb,
+          (entry) => {
+            const map = buildEndpointMap([entry]);
+            
+            // Track headers written to response
+            let writtenHeaders: Record<string, string> = {};
+            let writtenStatus = 0;
+            
+            const mockRes = {
+              writeHead: (status: number, headers: Record<string, string>) => {
+                writtenStatus = status;
+                writtenHeaders = headers;
+              },
+              end: () => {},
+            } as unknown as ServerResponse;
+            
+            const mockDashboard = () => {};
+            
+            // Create handler with CORS enabled (default)
+            const handler = createRequestHandler(map, mockDashboard, true);
+            
+            // Simulate request to proxy path
+            const proxyPath = getProxyPath(entry.path);
+            const mockReq = {
+              method: entry.method,
+              url: proxyPath,
+              headers: { host: 'localhost' },
+            };
+            
+            handler(mockReq as any, mockRes);
+            
+            // Verify CORS headers are present
+            expect(writtenHeaders['Access-Control-Allow-Origin']).toBe(DEFAULT_CORS_HEADERS['Access-Control-Allow-Origin']);
+            expect(writtenHeaders['Access-Control-Allow-Methods']).toBe(DEFAULT_CORS_HEADERS['Access-Control-Allow-Methods']);
+            expect(writtenHeaders['Access-Control-Allow-Headers']).toBe(DEFAULT_CORS_HEADERS['Access-Control-Allow-Headers']);
+            
+            return true;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+  });
+
+
+  /**
+   * **Feature: har-proxy, Property 13: Preflight OPTIONS Request Handling**
+   * *For any* OPTIONS request to a `/proxy/*` path when CORS is enabled,
+   * the Mock_Server SHALL respond with a 204 status code and include all required CORS headers.
+   * **Validates: Requirements 6.2**
+   */
+  describe('Property 13: Preflight OPTIONS Request Handling', () => {
+    it('should respond with 204 and CORS headers for OPTIONS requests to /proxy/* paths', () => {
+      fc.assert(
+        fc.property(
+          pathArb,
+          (path) => {
+            const map: EndpointMap = {};
+            
+            // Track response
+            let writtenHeaders: Record<string, string> = {};
+            let writtenStatus = 0;
+            let responseEnded = false;
+            
+            const mockRes = {
+              writeHead: (status: number, headers: Record<string, string>) => {
+                writtenStatus = status;
+                writtenHeaders = headers;
+              },
+              end: () => {
+                responseEnded = true;
+              },
+            } as unknown as ServerResponse;
+            
+            const mockDashboard = () => {};
+            
+            // Create handler with CORS enabled
+            const handler = createRequestHandler(map, mockDashboard, true);
+            
+            // Simulate OPTIONS request to proxy path
+            const proxyPath = getProxyPath(path);
+            const mockReq = {
+              method: 'OPTIONS',
+              url: proxyPath,
+              headers: { host: 'localhost' },
+            };
+            
+            handler(mockReq as any, mockRes);
+            
+            // Verify 204 status code
+            expect(writtenStatus).toBe(204);
+            
+            // Verify CORS headers are present
+            expect(writtenHeaders['Access-Control-Allow-Origin']).toBe(DEFAULT_CORS_HEADERS['Access-Control-Allow-Origin']);
+            expect(writtenHeaders['Access-Control-Allow-Methods']).toBe(DEFAULT_CORS_HEADERS['Access-Control-Allow-Methods']);
+            expect(writtenHeaders['Access-Control-Allow-Headers']).toBe(DEFAULT_CORS_HEADERS['Access-Control-Allow-Headers']);
+            
+            // Verify response was ended
+            expect(responseEnded).toBe(true);
+            
+            return true;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should not handle OPTIONS requests when CORS is disabled', () => {
+      fc.assert(
+        fc.property(
+          pathArb,
+          (path) => {
+            const map: EndpointMap = {};
+            
+            // Track response
+            let writtenStatus = 0;
+            
+            const mockRes = {
+              writeHead: (status: number) => {
+                writtenStatus = status;
+              },
+              end: () => {},
+            } as unknown as ServerResponse;
+            
+            const mockDashboard = () => {};
+            
+            // Create handler with CORS disabled
+            const handler = createRequestHandler(map, mockDashboard, false);
+            
+            // Simulate OPTIONS request to proxy path
+            const proxyPath = getProxyPath(path);
+            const mockReq = {
+              method: 'OPTIONS',
+              url: proxyPath,
+              headers: { host: 'localhost' },
+            };
+            
+            handler(mockReq as any, mockRes);
+            
+            // Should return 404 (no matching entry) instead of 204 preflight response
+            expect(writtenStatus).toBe(404);
+            
+            return true;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+  });
+
+
+  /**
+   * **Feature: har-proxy, Property 14: CORS Disabled Preserves Original Headers**
+   * *For any* HAR entry containing CORS headers, when CORS is disabled via `--no-cors`,
+   * the Mock_Server SHALL not inject automatic CORS headers but SHALL preserve
+   * the original CORS headers from the HAR recording.
+   * **Validates: Requirements 6.3, 6.4**
+   */
+  describe('Property 14: CORS Disabled Preserves Original Headers', () => {
+    // Generator for HAR entries with CORS headers
+    const corsHeaderArb = fc.constantFrom(
+      { name: 'Access-Control-Allow-Origin', value: 'https://example.com' },
+      { name: 'Access-Control-Allow-Methods', value: 'GET, POST' },
+      { name: 'Access-Control-Allow-Headers', value: 'X-Custom-Header' },
+      { name: 'Access-Control-Allow-Credentials', value: 'true' }
+    );
+
+    const harEntryWithCorsArb = fc.record({
+      method: httpMethodArb,
+      url: fc.constant('http://localhost'),
+      path: pathArb,
+      queryString: fc.constant([]),
+      requestHeaders: fc.constant([]),
+      status: statusCodeArb,
+      responseHeaders: fc.array(corsHeaderArb, { minLength: 1, maxLength: 4 }),
+      responseBody: fc.string({ maxLength: 200 }),
+      contentType: mimeTypeArb,
+      timestamp: fc.date().map((d) => d.toISOString()),
+    });
+
+    it('should preserve original HAR CORS headers when CORS is disabled', () => {
+      fc.assert(
+        fc.property(
+          harEntryWithCorsArb,
+          (entry) => {
+            const map = buildEndpointMap([entry]);
+            
+            // Track headers written to response
+            let writtenHeaders: Record<string, string> = {};
+            
+            const mockRes = {
+              writeHead: (status: number, headers: Record<string, string>) => {
+                writtenHeaders = headers;
+              },
+              end: () => {},
+            } as unknown as ServerResponse;
+            
+            const mockDashboard = () => {};
+            
+            // Create handler with CORS disabled
+            const handler = createRequestHandler(map, mockDashboard, false);
+            
+            // Simulate request to proxy path
+            const proxyPath = getProxyPath(entry.path);
+            const mockReq = {
+              method: entry.method,
+              url: proxyPath,
+              headers: { host: 'localhost' },
+            };
+            
+            handler(mockReq as any, mockRes);
+            
+            // Verify original HAR CORS headers are preserved
+            for (const header of entry.responseHeaders) {
+              expect(writtenHeaders[header.name]).toBe(header.value);
+            }
+            
+            // Verify automatic CORS headers are NOT injected (unless they were in original HAR)
+            const originalHasAllowOrigin = entry.responseHeaders.some(
+              h => h.name === 'Access-Control-Allow-Origin'
+            );
+            if (!originalHasAllowOrigin) {
+              expect(writtenHeaders['Access-Control-Allow-Origin']).toBeUndefined();
+            }
+            
+            return true;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should not inject automatic CORS headers when CORS is disabled', () => {
+      fc.assert(
+        fc.property(
+          harEntryArb.filter(e => 
+            !e.responseHeaders.some(h => 
+              h.name.toLowerCase().startsWith('access-control-')
+            )
+          ),
+          (entry) => {
+            const map = buildEndpointMap([entry]);
+            
+            // Track headers written to response
+            let writtenHeaders: Record<string, string> = {};
+            
+            const mockRes = {
+              writeHead: (status: number, headers: Record<string, string>) => {
+                writtenHeaders = headers;
+              },
+              end: () => {},
+            } as unknown as ServerResponse;
+            
+            const mockDashboard = () => {};
+            
+            // Create handler with CORS disabled
+            const handler = createRequestHandler(map, mockDashboard, false);
+            
+            // Simulate request to proxy path
+            const proxyPath = getProxyPath(entry.path);
+            const mockReq = {
+              method: entry.method,
+              url: proxyPath,
+              headers: { host: 'localhost' },
+            };
+            
+            handler(mockReq as any, mockRes);
+            
+            // Verify NO automatic CORS headers are present
+            expect(writtenHeaders['Access-Control-Allow-Origin']).toBeUndefined();
+            expect(writtenHeaders['Access-Control-Allow-Methods']).toBeUndefined();
+            expect(writtenHeaders['Access-Control-Allow-Headers']).toBeUndefined();
+            
             return true;
           }
         ),

@@ -30,6 +30,7 @@ har-proxy <har-file> [options]
 | Option | Description | Default |
 |--------|-------------|---------|
 | `-p, --port <number>` | Port to run the server on | `3000` |
+| `--no-cors` | Disable automatic CORS header injection | CORS enabled |
 | `-V, --version` | Output the version number | - |
 | `-h, --help` | Display help information | - |
 
@@ -42,7 +43,33 @@ har-proxy recording.har
 # Start server on custom port
 har-proxy recording.har --port 8080
 har-proxy recording.har -p 8080
+
+# Disable automatic CORS headers (use original HAR CORS headers)
+har-proxy recording.har --no-cors
 ```
+
+## CORS Support
+
+By default, har-proxy automatically adds CORS headers to all responses, allowing cross-origin requests from any domain:
+
+- `Access-Control-Allow-Origin: *`
+- `Access-Control-Allow-Methods: GET, POST, PUT, DELETE, PATCH, OPTIONS`
+- `Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With`
+
+The server also handles preflight OPTIONS requests automatically.
+
+### Disabling CORS
+
+Use `--no-cors` when:
+- Your HAR file already contains custom CORS headers you want to preserve
+- You need to test CORS behavior with specific origins
+- Your frontend handles CORS differently
+
+```bash
+har-proxy recording.har --no-cors
+```
+
+When CORS is disabled, any CORS headers present in the original HAR recording will be preserved.
 
 ## Important: Proxy Path
 
@@ -96,6 +123,7 @@ The dashboard displays all loaded endpoints grouped by base path, showing:
    🚀 HAR Proxy server running at http://localhost:3000
    📊 Dashboard available at http://localhost:3000/
    📦 Loaded 15 endpoints
+   🌐 CORS: enabled (default)
 
    Press Ctrl+C to stop the server
    ```
